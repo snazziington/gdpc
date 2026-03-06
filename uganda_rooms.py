@@ -16,8 +16,9 @@ editor.loadWorldSlice(cache=True)
 # Get heightmap
 heightmap = editor.worldSlice.heightmaps["MOTION_BLOCKING_NO_LEAVES"] # type: ignore
 
-#  y = house floor height
-y = heightmap[1, 1] + 3# + 3 is temporary while i do blueprints
+# x & z coordinates to build the house
+houseX1 = buildArea.offset.x + 1 + 20 # temp + 20
+houseZ1 = buildArea.offset.z + 1 + 20 # temp + 20
 
 # region VARIABLE PCG
 # House Sizing
@@ -40,10 +41,6 @@ print("garageHouse: ", garageHouse)
 if garageHouse == 1:
     garageDoorsOpen = randint(0, 1) # 0 = garage doors shut, 1 = garade doors open
     print("garageDoorsOpen: ", garageDoorsOpen)
-
-# x & z coordinates to build the house
-houseX1 = buildArea.offset.x + 1 + 20 # temp + 20
-houseZ1 = buildArea.offset.z + 1 + 20 # temp + 20
 
 # clear area
 placeCuboid(editor, (houseX1 - 25, y - 2, houseZ1 - 25), (houseX1 + 60, y + 20, houseZ1 + 50), Block("air"))
