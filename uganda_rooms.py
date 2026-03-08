@@ -6,7 +6,7 @@ from gdpc.geometry import placeCuboid, placeCuboidHollow, placeRectOutline, plac
 editor = Editor(buffering=True)
 
 buildArea = editor.getBuildArea()
-
+print(buildArea)
 placeRectOutline(editor, buildArea.toRect(), 67, Block("red_concrete"))
 
 # region HOUSE PLACEMENT
@@ -19,6 +19,9 @@ heightmap = editor.worldSlice.heightmaps["MOTION_BLOCKING_NO_LEAVES"] # type: ig
 # x & z coordinates to build the house
 houseX1 = buildArea.offset.x + 1 + 20 # temp + 20
 houseZ1 = buildArea.offset.z + 1 + 20 # temp + 20
+
+#  y = house floor height
+y = heightmap[1, 1] + 20# + 3 is temporary while i do blueprints
 
 # region VARIABLE PCG
 # House Sizing
@@ -52,8 +55,8 @@ houseBoundingZ1 = houseZ1
 houseBoundingZ2 = houseZ1 + lRoomDepth
 
 # House
-placeCuboidWireframe(editor, (houseBoundingX1, y, houseBoundingZ1),
-                    (houseBoundingX2, y + 15, houseBoundingZ2), Block("red_wool"))
+# placeCuboidWireframe(editor, (houseBoundingX1, y, houseBoundingZ1),
+                    #(houseBoundingX2, y + 15, houseBoundingZ2), Block("red_wool"))
 
 # Garage Sizing
 garageWidth = choice([7, 9])
@@ -66,8 +69,9 @@ porchBoundingX1 = houseX1
 porchBoundingX2 = houseX1 + lRoomWidth
 porchBoundingZ1 = houseBoundingZ1 - 5
 porchBoundingZ2 = houseBoundingZ1
-placeCuboidWireframe(editor, (porchBoundingX1, y, porchBoundingZ1), # porch depth is always 5
-                    (porchBoundingX2, y + 10, porchBoundingZ2), Block("green_wool"))
+#placeCuboidWireframe(editor, (porchBoundingX1, y, porchBoundingZ1), # porch depth is always 5
+
+                    #(porchBoundingX2, y + 10, porchBoundingZ2), Block("green_wool"))
 
 # Garage (if present)
 garageBoundingX1 = porchBoundingX2 + 1
@@ -75,11 +79,13 @@ garageBoundingX2 = garageBoundingX1 + garageWidth
 garageBoundingZ1 = int(houseZ1 * .7 + (houseZ1 + lRoomDepth) * 0.3)
 garageBoundingZ2 = houseBoundingZ2
 if garageHouse == 1 and garageDoorsOpen == 0:
-    placeCuboidWireframe(editor, (garageBoundingX1, y, garageBoundingZ1), # porch depth is always 5
-                    (garageBoundingX2, y + 10, garageBoundingZ2), Block("blue_wool"))
+    ...
+#    placeCuboidWireframe(editor, (garageBoundingX1, y, garageBoundingZ1), # porch depth is always 5
+                    #(garageBoundingX2, y + 10, garageBoundingZ2), Block("blue_wool"))
 elif garageDoorsOpen == 1 and garageDoorsOpen == 1:
-    placeCuboidWireframe(editor, (garageBoundingX1, y, garageBoundingZ1 - 4), # porch depth is always 5
-                    (garageBoundingX2, y + 10, garageBoundingZ2), Block("blue_wool"))
+#    placeCuboidWireframe(editor, (garageBoundingX1, y, garageBoundingZ1 - 4), # porch depth is always 5
+    ...
+                    #(garageBoundingX2, y + 10, garageBoundingZ2), Block("blue_wool"))
 
 # endregion
 
