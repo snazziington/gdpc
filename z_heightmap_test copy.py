@@ -16,12 +16,6 @@ buildAreaX1 = buildArea.offset.x + 1
 buildAreaZ1 = buildArea.offset.z + 1
 worldSlice = editor.loadWorldSlice()
 
-# 3. Store the WorldSlice in the Editor
-editor.loadWorldSlice(buildRect, cache=True)
-
-# Get heightmap
-heightmap = editor.worldSlice.heightmaps["MOTION_BLOCKING_NO_LEAVES"] # type: ignore
-
 # House Dimensions
 hallwayLength = randint(10, 18) # length of hallway. if > 15, third bedroom spawns
 print("hallwayLength: ", hallwayLength)
@@ -77,7 +71,6 @@ global flattestLandCoords
 flattestLandCoords = []
 
 lowestStdDev = 10
-
 pillarHeight = 1
 
 # region HOUSE PLACEMENT
