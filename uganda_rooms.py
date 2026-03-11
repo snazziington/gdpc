@@ -1,4 +1,4 @@
-import math
+import math, statistics
 from random import randint, choice
 from gdpc import Editor, Block #, Transform
 from gdpc.geometry import placeCuboid, placeCuboidHollow, placeRectOutline, placeCuboidWireframe
@@ -15,15 +15,25 @@ placeRectOutline(editor, buildArea.toRect(), 67, Block("red_concrete"))
 editor.loadWorldSlice(cache=True)
 
 # Get heightmap
-heightmap = editor.worldSlice.heightmaps["MOTION_BLOCKING_NO_LEAVES"] # type: ignore
+heightmap = editor.worldSlice.heightmaps["OCEAN_FLOOR"] # type: ignore
 
 # x & z coordinates to build the house
 buildAreaX1 = buildArea.offset.x + 1
 buildAreaZ1 = buildArea.offset.z + 1
 
-#  y = house floor height
-y = heightmap[1, 1] + 1# + 3 is temporary while i do blueprints
-# endregion
+#  region FIND FLAT FLOOR
+global heightMapList
+heightMapList = []
+
+global heightMapAverages
+heightMapAverages = []
+
+global flattestLandCoords
+flattestLandCoords = []
+
+lowestStdDev = 10
+
+pillarHeight = 1
 
 # region ROOM SIZE PCG
 # House, Livingroom, Hallway Sizing
@@ -56,15 +66,91 @@ if garageHouse == 1:
 # endregion
 
 # region HOUSE BOUNDS
+
+# House Total Dimensions
+if garageHouse == 1:
+    houseTotalWidth = garageWidth + lRoomWidth + hallwayLength
+else:
+    houseTotalWidth = lRoomWidth + hallwayLength
+houseTotalDepth = lRoomDepth + 5 # porchDepth is always 5
+
+# Total
+houseTotalWidth = garageWidth + lRoomWidth + hallwayLength
+houseTotalDepth = lRoomDepth + 5
+
+# For the entire build area
+def calcHeightMap(x: int, z: int):
+    heightMapList = []
+    for xX in range (x, x + houseTotalWidth):
+        for zZ in range (z, z + houseTotalDepth):
+            y = heightmap[xX, zZ]
+            y = int(y)
+            heightMapList.append(y) # type: ignore
+
+    global lowestStdDev
+    global newStdDev
+
+    newStdDev = float(statistics.stdev(heightMapList))
+    if newStdDev < lowestStdDev:
+            if notSubmergedInWater():
+                lowestStdDev = newStdDev
+
+                global averageY
+                averageY = int(statistics.mean(heightMapList))
+                global lowestX
+                lowestX = x
+
+                global lowestZ
+                lowestZ = z
+
+                global pillarHeight
+                pillarHeight += 1
+                y = int(heightmap[lowestX, lowestZ] + 2) + 20
+
+def notSubmergedInWater():
+    global blockArray
+    blockArray = []
+    for xX in range (x, x + houseTotalWidth):
+        if xX % 5 == 0:
+            for zZ in range (z, z + houseTotalDepth):
+                if zZ % 5 == 0:
+                    y = heightmap[xX, zZ]
+                    y = int(y)
+                    block = editor.getBlock((xX, y, zZ))
+                    print(block)
+    return True
+    
+
+for x in range (0, 100 - houseTotalWidth):
+    if x % 10 == 0:
+        for z in range (0, 100 - houseTotalDepth):
+            if z % 10 == 0:
+                calcHeightMap(x, z)
+print("Lowest stdDev is found at: ", lowestX, lowestZ)
+
+y1 = heightmap[lowestX, lowestZ] - 1
+y2 = heightmap[lowestX + houseTotalWidth, lowestZ + houseTotalDepth] - 1
+
+editor.placeBlock((lowestX + buildArea.offset.x, y1 + 30, lowestZ + buildArea.offset.z), Block("netherite_block"))
+editor.placeBlock((lowestX + buildArea.offset.x + houseTotalWidth,
+                   y1 + 30,
+                   lowestZ + buildArea.offset.z + houseTotalDepth), Block("iron_block"))
+
+y = averageY + 1
+
+buildAreaX1 = lowestX + buildArea.offset.x
+buildAreaZ1 = lowestZ + buildArea.offset.z
+
 # House Bounds
-houseBoundingX1 = buildAreaX1 - hallwayLength
-houseBoundingX2 = buildAreaX1 + lRoomWidth
-houseBoundingZ1 = buildAreaZ1
-houseBoundingZ2 = buildAreaZ1 + lRoomDepth
+houseBoundingX1 = buildAreaX1 + 2
+houseBoundingX2 = houseBoundingX1 + lRoomWidth + hallwayLength
+houseBoundingZ1 = buildAreaZ1 + 7
+houseBoundingZ2 = houseBoundingZ1 + lRoomDepth
 
 # Porch Bounds
-porchBoundingX1 = buildAreaX1
-porchBoundingX2 = buildAreaX1 + lRoomWidth
+porchDepth = 5
+porchBoundingX2 = houseBoundingX2
+porchBoundingX1 = porchBoundingX2 - lRoomWidth
 porchBoundingZ1 = houseBoundingZ1 - 5
 porchBoundingZ2 = houseBoundingZ1
 
@@ -74,25 +160,20 @@ garageBoundingX2 = garageBoundingX1 + garageWidth
 garageBoundingZ1 = math.floor(houseBoundingZ2 - garageDepth)
 garageBoundingZ2 = houseBoundingZ2
 
-# House Total Dimensions
-houseTotalWidth = garageWidth + lRoomWidth + hallwayLength
-houseTotalDepth = lRoomDepth + (porchBoundingZ2 - porchBoundingZ1)
+# Clear area for house
 
-# Clear house area
-placeCuboid(editor, (houseBoundingX1, y, houseBoundingZ1), (houseBoundingX2 + 60, y, houseBoundingZ2 + 10), Block("air"))
-placeCuboid(editor, (porchBoundingX1, y, porchBoundingZ1), (porchBoundingX2 + 60, y, porchBoundingZ2 + 10), Block("air"))
-placeCuboid(editor, (buildAreaX1, y, buildAreaZ1), (buildAreaX1, y, buildAreaZ1), Block("grass_block"))
+# House proper
+placeCuboid(editor, (houseBoundingX1, y, houseBoundingZ1),
+           (houseBoundingX2, y + houseHeight, houseBoundingZ2), Block("air"))
+
+# Porch
+placeCuboid(editor, (porchBoundingX1, y, porchBoundingZ1),
+           (porchBoundingX2, y + houseHeight, porchBoundingZ2), Block("air"))
 
 # Garage
-if garageHouse == 1 and garageDoorsOpen == 0:
-    ...
-#    placeCuboidWireframe(editor, (garageBoundingX1, y, garageBoundingZ1), # porch depth is always 5
-                    #(garageBoundingX2, y + 10, garageBoundingZ2), Block("blue_wool"))
-elif garageDoorsOpen == 1 and garageDoorsOpen == 1:
-#    placeCuboidWireframe(editor, (garageBoundingX1, y, garageBoundingZ1 - 4), # porch depth is always 5
-    ...
-                    #(garageBoundingX2, y + 10, garageBoundingZ2), Block("blue_wool"))
-# endregion
+if garageHouse == 1:
+    placeCuboid(editor, (garageBoundingX1, y, garageBoundingZ1),
+               (garageBoundingX2, y + houseHeight, garageBoundingZ2), Block("air"))
 
 # region BLOCK PALETTES
 houseWalls = choice([
@@ -170,11 +251,11 @@ porchWall = choice([
 # region LIVINGROOM
 # Coordinates
 # Width
-lRoomX1 = buildAreaX1 # always n blocks from edge
+lRoomX1 = buildAreaX1 + hallwayLength + 2
 lRoomX2 = lRoomX1 + lRoomWidth
 
 #Depth
-lRoomZ1 = buildAreaZ1 # always n blocks from edge
+lRoomZ1 = buildAreaZ1 + porchDepth + 2
 lRoomZ2 = lRoomZ1 + lRoomDepth
 
 # Livingroom Palette
@@ -205,7 +286,8 @@ if houseHeight > 5:
 
 # Side
 if garageHouse == 1:
-    placeCuboidHollow(editor, (lRoomX2, windowY1, lRoomZ1), (lRoomX2, windowY2, garageBoundingZ1 - 2), windowBlock)
+    placeCuboidHollow(editor, (lRoomX2, windowY1, lRoomZ1), (lRoomX2, windowY2, int((lRoomZ1 * .7 + lRoomZ2 * 0.3)) - 1), windowBlock)
+    print(garageBoundingZ1 - 2)
 else:
     placeCuboidHollow(editor, (lRoomX2, windowY1, lRoomZ1), (lRoomX2, windowY2, lRoomZ2 - 1), windowBlock)
     livingroomWindowWidth = lRoomZ2 - lRoomZ1 - 1
@@ -258,7 +340,6 @@ porchX1 = lRoomX1
 porchX2 = lRoomX2
 
 #Depth
-porchDepth = 5
 porchZ2 = lRoomZ1
 porchZ1 = porchZ2 - porchDepth
 # endregion
@@ -671,19 +752,35 @@ houseX2 = lRoomX2
 houseZ2 = lRoomZ2
 
 # Main House
-placeCuboidHollow(editor, (bedroom2X1, y - 2, lRoomZ1), (houseX2, y - 1, houseZ2), foundationBlock)
-placeCuboidWireframe(editor, (bedroom2X1, y - 2, lRoomZ1), (houseX2, y, houseZ2), foundationBlock)
+placeCuboidHollow(editor, (bedroom2X1, y - 5, lRoomZ1), (houseX2, y - 1, houseZ2), foundationBlock)
+placeCuboidWireframe(editor, (bedroom2X1, y, lRoomZ1), (houseX2, y, houseZ2), foundationBlock)
+
+# Garage Foundation
+if garageHouse == 1:
+    placeCuboidHollow(editor, (garageX1, y - 5, garageZ1), (garageX2, y - 1, garageZ2), foundationBlock)
+    placeCuboidWireframe(editor, (garageX1, y, garageZ1), (garageX2, y, garageZ2), foundationBlock)
 
 # Porch Foundation
-placeCuboidHollow(editor, (porchX1, y - 2, porchZ1), (porchX2, y - 1, porchZ2), foundationBlock)
-placeCuboidWireframe(editor, (porchX1, y - 2, porchZ1), (porchX2, y, porchZ2), foundationBlock)
+placeCuboidHollow(editor, (porchX1, y - 5, porchZ1), (porchX2, y - 1, porchZ2), foundationBlock)
+placeCuboidWireframe(editor, (porchX1, y, porchZ1), (porchX2, y, porchZ2), foundationBlock)
 
 # porch staircase
-for i in range (0, 2):
-    placeCuboid(editor, (porchX1 - i - 1, y - i, porchZ1 + 2), (porchX1 - i - 1, y - i, porchZ2 - 2), Block(roofBlock + "_stairs", {"facing": "east"}))
-placeCuboid(editor, (porchX1 - 1, y - 1, porchZ1 + 2), (porchX1 - 1, y - 1, porchZ2 - 2), foundationBlock)
-# endregion
+for i in range (0, 10):
+    block = editor.getBlock((porchX1 - i - 1, y - i, porchZ1 + 2))
+    print(block, porchX1 - i - 1, y - i, porchZ1 + 2)
+    if block == Block("minecraft:air"):
+        #placeCuboid(editor, (porchX1 - i - 1, y - i, porchZ1 + 2), (porchX1 - i - 1, y - i, porchZ2 - 2), Block(roofBlock + "_stairs", {"facing": "east"}))
+        editor.placeBlock((porchX1 - i - 1, y - i, porchZ1 + 2), Block(roofBlock + "_stairs", {"facing": "east"}))
+        editor.placeBlock((porchX1 - i - 1, y - i - 1, porchZ1 + 2), foundationBlock)
 
+    block = editor.getBlock((porchX1 - i - 1, y - i, porchZ1 - 2))
+    if block == Block("minecraft:air"):
+        #placeCuboid(editor, (porchX1 - i - 1, y - i, porchZ2 - 2), (porchX1 - i - 1, y - i, porchZ2 - 2), Block(roofBlock + "_stairs", {"facing": "east"}))
+        editor.placeBlock((porchX1 - i - 1, y - i, porchZ2 - 2), Block(roofBlock + "_stairs", {"facing": "east"}))
+        editor.placeBlock((porchX1 - i - 1, y - i - 1, porchZ2 - 2), foundationBlock)
+
+# I think I will just do "check if there is block. if yes, do nothing. if not, place stair." lmao
+# endregion
 # endregion
 
 # region LIGHTING

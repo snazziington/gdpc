@@ -106,10 +106,6 @@ def calcHeightMap(x: int, z: int):
             global pillarHeight
             pillarHeight += 1
             y = int(heightmap[lowestX, lowestZ] + 2) + 20
-            print("Placing Block here:", (lowestX + buildArea.offset.x, y, lowestZ + buildArea.offset.z))
-            placeCuboidWireframe(editor, (lowestX + buildArea.offset.x, y, lowestZ + buildArea.offset.z),
-                                (lowestX + buildArea.offset.x + houseTotalWidth, y + pillarHeight, lowestZ + buildArea.offset.z + houseTotalDepth),
-                                Block("redstone_block"))
 
 for x in range (0, 100 - houseTotalWidth):
     if x % 10 == 0:
@@ -118,3 +114,9 @@ for x in range (0, 100 - houseTotalWidth):
                 calcHeightMap(x, z)
                 print("X, Z:", x, z)
 print("Lowest stdDev is found at: ", lowestX, lowestZ)
+
+y1 = heightmap[lowestX, lowestZ] - 1
+y2 = heightmap[lowestX + houseTotalWidth, lowestZ + houseTotalDepth] - 1
+
+editor.placeBlock(((lowestX + buildArea.offset.x, y1, lowestZ + buildArea.offset.z)), Block("redstone_block"))
+editor.placeBlock((lowestX + buildArea.offset.x + houseTotalWidth, y2, lowestZ + buildArea.offset.z + houseTotalDepth), Block("glowstone"))
