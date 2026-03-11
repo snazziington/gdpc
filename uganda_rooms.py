@@ -2,12 +2,14 @@ import math
 from random import randint, choice
 from gdpc import Editor, Block #, Transform
 from gdpc.geometry import placeCuboid, placeCuboidHollow, placeRectOutline, placeCuboidWireframe
+from gdpc.interface import runCommand
 
 editor = Editor(buffering=True)
 
 buildArea = editor.getBuildArea()
 placeRectOutline(editor, buildArea.toRect(), 67, Block("red_concrete"))
 
+# region BUILD HOUSE LAYOUT
 # region HOUSE PLACEMENT
 # Load world slice of the build area
 editor.loadWorldSlice(cache=True)
@@ -16,14 +18,14 @@ editor.loadWorldSlice(cache=True)
 heightmap = editor.worldSlice.heightmaps["MOTION_BLOCKING_NO_LEAVES"] # type: ignore
 
 # x & z coordinates to build the house
-houseX1 = buildArea.offset.x + 1 + 20 # temp + 20
-houseZ1 = buildArea.offset.z + 1 + 20 # temp + 20
+buildAreaX1 = buildArea.offset.x + 1
+buildAreaZ1 = buildArea.offset.z + 1
 
 #  y = house floor height
 y = heightmap[1, 1] + 1# + 3 is temporary while i do blueprints
 # endregion
 
-# region VARIABLE PCG
+# region ROOM SIZE PCG
 # House, Livingroom, Hallway Sizing
 houseHeight = randint(5, 7) # determines height of house
 print("houseHeight: ", houseHeight)
@@ -55,14 +57,14 @@ if garageHouse == 1:
 
 # region HOUSE BOUNDS
 # House Bounds
-houseBoundingX1 = houseX1 - hallwayLength
-houseBoundingX2 = houseX1 + lRoomWidth
-houseBoundingZ1 = houseZ1
-houseBoundingZ2 = houseZ1 + lRoomDepth
+houseBoundingX1 = buildAreaX1 - hallwayLength
+houseBoundingX2 = buildAreaX1 + lRoomWidth
+houseBoundingZ1 = buildAreaZ1
+houseBoundingZ2 = buildAreaZ1 + lRoomDepth
 
 # Porch Bounds
-porchBoundingX1 = houseX1
-porchBoundingX2 = houseX1 + lRoomWidth
+porchBoundingX1 = buildAreaX1
+porchBoundingX2 = buildAreaX1 + lRoomWidth
 porchBoundingZ1 = houseBoundingZ1 - 5
 porchBoundingZ2 = houseBoundingZ1
 
@@ -72,20 +74,14 @@ garageBoundingX2 = garageBoundingX1 + garageWidth
 garageBoundingZ1 = math.floor(houseBoundingZ2 - garageDepth)
 garageBoundingZ2 = houseBoundingZ2
 
+# House Total Dimensions
+houseTotalWidth = garageWidth + lRoomWidth + hallwayLength
+houseTotalDepth = lRoomDepth + (porchBoundingZ2 - porchBoundingZ1)
+
 # Clear house area
-placeCuboid(editor, (houseBoundingX1 - 25, y - 2, houseBoundingZ1 - 10), (houseBoundingX2 + 60, y + 20, houseBoundingZ2 + 10), Block("air"))
-placeCuboid(editor, (porchBoundingX1 - 25, y - 2, porchBoundingZ1 - 10), (porchBoundingX2 + 60, y + 20, porchBoundingZ2 + 10), Block("air"))
-placeCuboid(editor, (houseX1 - 25, y - 2, houseZ1 - 25), (houseX1 + 60, y - 2, houseZ1 + 50), Block("grass_block"))
-
-# Place the Bounding Area (Reference for Self)
-# House
-#placeCuboidWireframe(editor, (houseBoundingX1, y, houseBoundingZ1),
-                    #(houseBoundingX2, y + 15, houseBoundingZ2), Block("red_wool"))
-
-# Porch
-#placeCuboidWireframe(editor, (porchBoundingX1, y, porchBoundingZ1), # porch depth is always 5
-
-                    #(porchBoundingX2, y + 10, porchBoundingZ2), Block("green_wool"))
+placeCuboid(editor, (houseBoundingX1, y, houseBoundingZ1), (houseBoundingX2 + 60, y, houseBoundingZ2 + 10), Block("air"))
+placeCuboid(editor, (porchBoundingX1, y, porchBoundingZ1), (porchBoundingX2 + 60, y, porchBoundingZ2 + 10), Block("air"))
+placeCuboid(editor, (buildAreaX1, y, buildAreaZ1), (buildAreaX1, y, buildAreaZ1), Block("grass_block"))
 
 # Garage
 if garageHouse == 1 and garageDoorsOpen == 0:
@@ -174,11 +170,11 @@ porchWall = choice([
 # region LIVINGROOM
 # Coordinates
 # Width
-lRoomX1 = houseX1 # always n blocks from edge
+lRoomX1 = buildAreaX1 # always n blocks from edge
 lRoomX2 = lRoomX1 + lRoomWidth
 
 #Depth
-lRoomZ1 = houseZ1 # always n blocks from edge
+lRoomZ1 = buildAreaZ1 # always n blocks from edge
 lRoomZ2 = lRoomZ1 + lRoomDepth
 
 # Livingroom Palette
@@ -265,77 +261,6 @@ porchX2 = lRoomX2
 porchDepth = 5
 porchZ2 = lRoomZ1
 porchZ1 = porchZ2 - porchDepth
-# endregion
-
-# region GARAGE
-# Coordinates
-# Width
-garageX1 = lRoomX2 + 1
-garageX2 = garageX1 + garageWidth
-
-# Depth
-garageZ1 = int((lRoomZ1 * .7 + lRoomZ2 * 0.3))
-garageZ2 = lRoomZ2
-
-#Garage Palette
-garageWall = randint(0, 2)
-if garageWall == 0:
-    garageWall = ([Block("polished_deepslate"), Block("deepslate_bricks"), Block("cracked_deepslate_bricks")])
-elif garageWall == 1:
-    garageWall = ([Block("blackstone"), Block("polished_blackstone"),
-                   Block("polished_blackstone_bricks"), Block("cracked_polished_blackstone_bricks")])
-else:
-    garageWall = ([Block("stone"), Block("cobblestone"),
-                   Block("stone_bricks"), Block("cracked_stone_bricks")])
-garageFloor = Block("gray_wool")
-garageDoor = Block(houseDoor, {"facing": "east", "hinge": "right"})
-
-# Garage Wall + Door
-garageDoorBlock = choice(["waxed_copper_trapdoor", "iron_trapdoor", "acacia_trapdoor"])
-
-if garageHouse == 1:
-    placeCuboidHollow(editor, (garageX1, y, garageZ1), (garageX2, y + houseHeight, garageZ2), garageWall)
-    editor.placeBlock((garageX1, y+1, garageZ2 - 2), garageDoor)
-    placeCuboidHollow(editor, (garageX1 - 1, y+1, garageZ2 - 2), (garageX1 - 1, y + 2, garageZ2 - 2), Block("air"))
-    garageLeftX1 = garageX2 - 1
-    garageRightX1 = garageX1 + 1
-
-    if garageDoorsOpen == 0:
-        garageBigDoors = Block(garageDoorBlock, {"facing": "south", "half": "bottom", "open": "true"})
-        garageLeftX2 = garageLeftX1 - garageDoorWidth
-        garageRightX2 = garageRightX1 + garageDoorWidth
-
-        # Left Big Door
-        placeCuboidHollow(editor, (garageLeftX1, y + 1, garageZ1),
-                        (garageLeftX2, y +  houseHeight - 1, garageZ1), garageBigDoors)
-
-        # Right Big Door
-        placeCuboidHollow(editor, (garageRightX1, y + 1, garageZ1),
-                        (garageRightX2, y +  houseHeight - 1, garageZ1), garageBigDoors)
-
-    else:
-        garageLeftDoors = Block(garageDoorBlock, {"facing": "west", "half": "bottom", "open": "true"})
-        garageRightDoors = Block(garageDoorBlock, {"facing": "east", "half": "bottom", "open": "true"})
-        garageLeftZ2 = garageZ1 - garageDoorWidth - 1
-        garageLeftZ1 = garageZ1
-        
-        garageRightZ2 = garageZ1 - garageDoorWidth - 1
-        garageRightZ1 = garageZ1
-
-        # Left Big Door
-        placeCuboidHollow(editor, (garageLeftX1, y + 1, garageLeftZ1),
-                        (garageLeftX1, y +  houseHeight - 1, garageLeftZ2), garageLeftDoors)
-
-        # Right Big Door
-        placeCuboidHollow(editor, (garageRightX1, y + 1, garageRightZ1),
-                        (garageRightX1, y +  houseHeight - 1, garageRightZ2), garageRightDoors)
-        
-        # Clear the space between the open doors
-        placeCuboidHollow(editor, (garageLeftX1, y + 1, garageZ1),
-                        (garageRightX1, y +  houseHeight - 1, garageZ1), Block("air"))
-        
-    # Garage Floor
-    placeCuboidHollow(editor, (garageX1, y, garageZ1), (garageX2, y, garageZ2), garageFloor)
 # endregion
 
 # region HALLWAY
@@ -670,6 +595,77 @@ placeCuboidHollow(editor, (porchX1, y, porchZ1), (porchX2, y, porchZ2), porchFlo
 # endregion
 # endregion
 
+# region GARAGE
+# Coordinates
+# Width
+garageX1 = lRoomX2 + 1
+garageX2 = garageX1 + garageWidth
+
+# Depth
+garageZ1 = int((lRoomZ1 * .7 + lRoomZ2 * 0.3))
+garageZ2 = lRoomZ2
+
+#Garage Palette
+garageWall = randint(0, 2)
+if garageWall == 0:
+    garageWall = ([Block("polished_deepslate"), Block("deepslate_bricks"), Block("cracked_deepslate_bricks")])
+elif garageWall == 1:
+    garageWall = ([Block("blackstone"), Block("polished_blackstone"),
+                   Block("polished_blackstone_bricks"), Block("cracked_polished_blackstone_bricks")])
+else:
+    garageWall = ([Block("stone"), Block("cobblestone"),
+                   Block("stone_bricks"), Block("cracked_stone_bricks")])
+garageFloor = Block("gray_wool")
+garageDoor = Block(houseDoor, {"facing": "east", "hinge": "right"})
+
+# Garage Wall + Door
+garageDoorBlock = choice(["waxed_copper_trapdoor", "iron_trapdoor", "acacia_trapdoor"])
+
+if garageHouse == 1:
+    placeCuboidHollow(editor, (garageX1, y, garageZ1), (garageX2, y + houseHeight, garageZ2), garageWall)
+    editor.placeBlock((garageX1, y+1, garageZ2 - 2), garageDoor)
+    placeCuboidHollow(editor, (garageX1 - 1, y+1, garageZ2 - 2), (garageX1 - 1, y + 2, garageZ2 - 2), Block("air"))
+    garageLeftX1 = garageX2 - 1
+    garageRightX1 = garageX1 + 1
+
+    if garageDoorsOpen == 0:
+        garageBigDoors = Block(garageDoorBlock, {"facing": "south", "half": "bottom", "open": "true"})
+        garageLeftX2 = garageLeftX1 - garageDoorWidth
+        garageRightX2 = garageRightX1 + garageDoorWidth
+
+        # Left Big Door
+        placeCuboidHollow(editor, (garageLeftX1, y + 1, garageZ1),
+                        (garageLeftX2, y +  houseHeight - 1, garageZ1), garageBigDoors)
+
+        # Right Big Door
+        placeCuboidHollow(editor, (garageRightX1, y + 1, garageZ1),
+                        (garageRightX2, y +  houseHeight - 1, garageZ1), garageBigDoors)
+
+    else:
+        garageLeftDoors = Block(garageDoorBlock, {"facing": "west", "half": "bottom", "open": "true"})
+        garageRightDoors = Block(garageDoorBlock, {"facing": "east", "half": "bottom", "open": "true"})
+        garageLeftZ2 = garageZ1 - garageDoorWidth - 1
+        garageLeftZ1 = garageZ1
+        
+        garageRightZ2 = garageZ1 - garageDoorWidth - 1
+        garageRightZ1 = garageZ1
+
+        # Left Big Door
+        placeCuboidHollow(editor, (garageLeftX1, y + 1, garageLeftZ1),
+                        (garageLeftX1, y +  houseHeight - 1, garageLeftZ2), garageLeftDoors)
+
+        # Right Big Door
+        placeCuboidHollow(editor, (garageRightX1, y + 1, garageRightZ1),
+                        (garageRightX1, y +  houseHeight - 1, garageRightZ2), garageRightDoors)
+        
+        # Clear the space between the open doors
+        placeCuboidHollow(editor, (garageLeftX1, y + 1, garageZ1),
+                        (garageRightX1, y +  houseHeight - 1, garageZ1), Block("air"))
+        
+    # Garage Floor
+    placeCuboidHollow(editor, (garageX1, y, garageZ1), (garageX2, y, garageZ2), garageFloor)
+# endregion
+
 # region FOUNDATION
 houseX2 = lRoomX2
 houseZ2 = lRoomZ2
@@ -686,6 +682,8 @@ placeCuboidWireframe(editor, (porchX1, y - 2, porchZ1), (porchX2, y, porchZ2), f
 for i in range (0, 2):
     placeCuboid(editor, (porchX1 - i - 1, y - i, porchZ1 + 2), (porchX1 - i - 1, y - i, porchZ2 - 2), Block(roofBlock + "_stairs", {"facing": "east"}))
 placeCuboid(editor, (porchX1 - 1, y - 1, porchZ1 + 2), (porchX1 - 1, y - 1, porchZ2 - 2), foundationBlock)
+# endregion
+
 # endregion
 
 # region LIGHTING
@@ -734,11 +732,303 @@ addCornerLighting(bathroomX1, bathroomZ2, bathroomX2, bathroomZ1)
 garageLightY = y + houseHeight - 1
 garageLightBlock = choice([Block("lantern"), Block("waxed_copper_lantern"), Block("waxed_oxidized_copper_lantern"),
                            Block("end_rod", {"facing": "down"})])
-editor.placeBlock((garageX1 + 1, garageLightY, garageZ1 + 1), garageLightBlock)
-editor.placeBlock((garageX2 - 1, garageLightY, garageZ1 + 1), garageLightBlock)
-editor.placeBlock((garageX1 + 1, garageLightY, garageZ2 - 1), garageLightBlock)
-editor.placeBlock((garageX2 - 1, garageLightY, garageZ2 - 1), garageLightBlock)
+if garageHouse == 1:
+    editor.placeBlock((garageX1 + 1, garageLightY, garageZ1 + 1), garageLightBlock)
+    editor.placeBlock((garageX2 - 1, garageLightY, garageZ1 + 1), garageLightBlock)
+    editor.placeBlock((garageX1 + 1, garageLightY, garageZ2 - 1), garageLightBlock)
+    editor.placeBlock((garageX2 - 1, garageLightY, garageZ2 - 1), garageLightBlock)
 # endregion
 
 # region FURNITURE
+
+# region PALETTE
+chairWood = choice([
+    "oak",
+    "birch",
+    "acacia",
+    "mangrove",
+    "cherry",
+    "pale_oak",
+    "crimson"
+])
+
+chairArmWood = choice([
+    "dark_oak",
+    "spruce",
+    "birch",
+    "mangrove",
+    "cherry",
+    "pale_oak",
+    "crimson",
+])
+
+while chairWood == chairArmWood:
+    print("Rerolling chairArmWood")
+    chairArmWood = choice([
+    "dark_oak",
+    "spruce",
+    "birch",
+    "mangrove",
+    "cherry",
+    "pale_oak",
+    "crimson",
+    ])
+
+# Painting colour associations
+redPaintings = ["donkey_kong"]
+orangePaintings = ["skeleton", "finding"]
+yellowPaintings = ["changing", "wasteland", "alban", "bomb", "kebab"]
+greenPaintings = ["aztec2", "plant", "fighters", "dennis"]
+lightBluePaintings = ["creebet", "sea", "meditative", "pool", "tides"]
+purplePaintings = ["sunset", "lowmist"]
+grayPaintings = ["passage", "aztec", "courbet", "endboss"]
+brownPaintings = ["bouquet", "cavebird", "cotan", "fern",
+                  "owlemons", "sunflowers"]
+
+
+def chooseAccentColour(painting: str):
+    global accentColour 
+    if painting in redPaintings:
+        accentColour = choice(["red", "black", "light_gray", "white"])
+
+    elif painting in orangePaintings:
+        accentColour = choice(["orange", "white", "light_gray", "brown", "gray"])
+
+    elif painting in yellowPaintings:
+        accentColour = choice(["orange", "yellow", "lime", "green"])
+        print(accentColour)
+    
+    elif painting in greenPaintings:
+        accentColour = choice(["green", "white", "light_gray"])
+    
+    elif painting in lightBluePaintings:
+        accentColour = choice(["light_blue"])
+    
+    elif painting in purplePaintings:
+        accentColour = choice(["cyan", "blue", "purple"])
+    
+    elif painting in grayPaintings:
+        accentColour = choice(["white", "light_gray", "gray"])
+
+    elif painting in brownPaintings:
+        accentColour = choice(["brown", "yellow"])
+
+
+    else:
+        accentColour = choice(["magenta"])
+  
+
+food = choice([
+    ("cooked_porkchop", "cooked_beef", "cooked_mutton", "cooked_chicken", "cooked_rabbit"), # Meal #1
+    ("rabbit_stew", "beetroot_soup", "mushroom_stew"), # Meal #2
+    ("cooked_salmon", "cooked_cod"), # Meal #3
+    ("baked_potato", "golden_carrot", "carrot"), # Meal #4
+    ("pumpkin_pie", "cake"), # Meal #5
+    ("bread", "cookie") # Meal #6
+])
+# endregion
+# region Living Room
+# endregion
+
+# region Livingroom
+bannerY = y
+onFloorY = y + 1
+
+# Dining Chair def    slab coords,    tradoor coords,   banner direction,  trapdoor direction
+def placeDiningChairs(x: int, z: int, xT: int, zT: int, bannerFacing: str, trapdoorFacing: str):
+    # Slab
+    editor.placeBlock((x, onFloorY, z), Block(chairWood + "_slab", {"type": "bottom"}))
+
+    # Trapdoors
+    editor.placeBlock((xT, onFloorY, zT), Block(chairWood + "_trapdoor", {"facing": trapdoorFacing, "open": "true"}))
+    editor.placeBlock((xT, onFloorY + 1, zT), Block(chairWood + "_trapdoor", {"facing": trapdoorFacing, "open": "true"}))
+
+    # Banner
+    editor.placeBlock((x, onFloorY + 1, z), Block(accentColour + "_wall_banner", {"facing": bannerFacing}))
+
+# Door couch dimensions
+couchDX1 = lRoomX1 + 4 # corner next to door
+couchDX2 = lRoomX2 - 2 # next to wall corner
+
+couchDZ1 = lRoomZ1 + 1 # corner next to door
+
+# Right-side couch dimensions
+couchRX1 = lRoomX1 + 3 # side next to door
+
+couchRZ1 = lRoomZ1 + 3 # side next to door
+couchRZ2 = lRoomZ2 - 9 # far-end of couch
+
+# Back couch dimensions
+couchBX1 = lRoomX1 + 3 # hallway-side
+couchBX2 = lRoomX2 - 2 # wall side
+couchBZ1 = lRoomZ2 - 8 # depth
+
+rightCouchLength = (lRoomZ2 - 9) - (lRoomZ1 + 3)
+print("rightCouchLength: ", rightCouchLength)
+
+# TV
+tvX = str(lRoomX2 - 1)
+tvY = str(y + 3)
+tvZ = str(couchRZ1)
+
+if rightCouchLength == 1:
+    tvScreen = choice([
+    "kebab", "aztec", "alban", "aztec2", 
+    "bomb", "plant", "wasteland", "meditative"
+])
+    tvY = str(y + 2)
+    tvShelfHeight = 1
+    
+elif rightCouchLength == 2:
+    tvScreen = choice([
+    "pool", "courbet", "sunset", "sea", "creebet"
+])
+    tvY = str(y + 2)
+    tvShelfHeight = 1
+    
+elif rightCouchLength == 3:
+    tvScreen = choice([
+    "bouquet", "cavebird", "cotan", "endboss", "fern",
+    "owlemons", "sunflowers", "tides", "dennis"
+])
+    tvZ = str(couchRZ1 + 1)
+    tvShelfHeight = 4
+    
+elif rightCouchLength == 4 and houseHeight == 5:
+    tvScreen = choice([
+    "fighters", "changing", "finding", "lowmist", "passage"
+])  
+    tvY = str(y + 2)
+    tvZ = str(couchRZ1 + 1)
+    tvShelfHeight = 3
+
+else:
+    tvScreen = choice([
+    "skeleton", "donkey_kong"
+])
+    tvZ = str(couchRZ1 + 1)
+    tvShelfHeight = 4
+    
+placeCuboid(editor, (lRoomX2 - 1, y + 2, couchRZ1 - 1), (lRoomX2 - 1, y + tvShelfHeight, couchRZ1 - 1),
+            Block(chairArmWood + "_trapdoor", {"facing": "west", "open": "true"}))
+
+placeCuboid(editor, (lRoomX2 - 1, y + 2, couchRZ2), (lRoomX2 - 1, y + tvShelfHeight, couchRZ2),
+            Block(chairArmWood + "_trapdoor", {"facing": "west", "open": "true"}))
+
+chooseAccentColour(tvScreen)
+print("tvScreen: ", tvScreen)
+
+# Placing Chairs
+def placeLRoomChairs(cX1: int, cZ1: int, cX2: int, cZ2: int, bannerFacing: int, chairFacing: str):
+    # Chairs
+    placeCuboid(editor, (cX1, onFloorY, cZ1), (cX2, onFloorY, cZ2), Block(chairWood + "_stairs", {"facing": chairFacing}))
+
+    # Glowstone (to light banners)
+    placeCuboidHollow(editor, (cX1, y - 1, cZ1), (cX2, y - 1, cZ2), Block("glowstone"))
+    
+    # Banners (couch pillows)
+    placeCuboidHollow(editor, (cX1, bannerY, cZ1), (cX2, bannerY, cZ2), Block(accentColour + "_banner", {"rotation": bannerFacing}))
+
+# Placing Trapdoors (Armrests)
+def placeLRoomTrapdoors(tX1: int, tZ1: int, trapdoorFacing: str):
+    editor.placeBlock((tX1, onFloorY, tZ1), Block(chairArmWood + "_trapdoor", {"facing": trapdoorFacing, "open": "true"}))
+
+placeLRoomChairs(couchDX1, couchDZ1, couchDX2, couchDZ1, 0, "north")
+placeLRoomTrapdoors(couchDX1 - 1, couchDZ1, "west") # next to door armrest
+placeLRoomTrapdoors(couchDX2 + 1, couchDZ1, "east") # next to wall armrest
+
+placeLRoomChairs(couchRX1, couchRZ1, couchRX1, couchRZ2, 12, "west")
+placeLRoomTrapdoors(couchRX1, couchRZ1 - 1, "north") # door-side armrest
+
+placeLRoomChairs(couchBX1, couchBZ1, couchDX2, couchBZ1, 8, "south")
+placeLRoomTrapdoors(couchBX2 + 1, couchBZ1, "east") # wall-side armrest
+
+# Remove corner banner
+editor.placeBlock((couchRX1, bannerY, couchBZ1), Block("air"))
+
+# Coffee Table
+placeCuboid(editor, (couchBX1 + 2, onFloorY, couchRZ1), (couchBX2, onFloorY, couchRZ2 - 1),
+            Block(chairArmWood + "_slab", {"type": "top"}))
+
+ 
+# Decides dining room setup based on living room dimensions
+if lRoomWidth == 7:
+    diningSetup = 0
+    diningTableX1 = lRoomX1 + 3
+    diningTableX2 = diningTableX1
+    diningTableZ1 = lRoomZ2 - 5
+    diningTableZ2 = diningTableZ1 + 2
+
+    # Chairs
+    placeDiningChairs(diningTableX1, lRoomZ2 - 2, diningTableX1, lRoomZ2 - 1, "north", "south") # back
+    placeDiningChairs(diningTableX1, lRoomZ2 - 6, diningTableX1, lRoomZ2 - 7, "south", "north") # front
+
+    placeDiningChairs(diningTableX1 - 1, lRoomZ2 - 3, diningTableX1 - 2, lRoomZ2 - 3, "east", "west") # right - front
+    placeDiningChairs(diningTableX1 - 1, lRoomZ2 - 5, diningTableX1 - 2, lRoomZ2 - 5, "east", "west") # right - back
+
+    placeDiningChairs(diningTableX1 + 1, lRoomZ2 - 3, diningTableX1 + 2, lRoomZ2 - 3, "west", "east") # left - front
+    placeDiningChairs(diningTableX1 + 1, lRoomZ2 - 5, diningTableX1 + 2, lRoomZ2 - 5, "west", "east") # left - back
+
+elif ((lRoomWidth == 8 and (lRoomDepth == 13 or lRoomDepth == 14)) or
+      (lRoomWidth == 9 and (lRoomDepth == 13 or lRoomDepth == 14))):
+    diningSetup = 1
+    diningTableX1 = lRoomX1 + 3
+    diningTableX2 = diningTableX1 + 2
+    diningTableZ1 = lRoomZ2 - 3
+    diningTableZ2 = diningTableZ1
+    
+    # Chairs
+    placeDiningChairs(diningTableX1 + 2, lRoomZ2 - 2, diningTableX1 + 2, lRoomZ2 - 1, "north", "south") # back - left
+    placeDiningChairs(diningTableX1, lRoomZ2 - 2, diningTableX1, lRoomZ2 - 1, "north", "south") # back - right
+    
+    placeDiningChairs(diningTableX1 + 2, lRoomZ2 - 4, diningTableX1 + 2, lRoomZ2 - 5, "south", "north") # front - left
+    placeDiningChairs(diningTableX1, lRoomZ2 - 4, diningTableX1, lRoomZ2 - 5, "south", "north") # front - right
+
+    placeDiningChairs(diningTableX1 - 1, lRoomZ2 - 3, diningTableX1 - 2, lRoomZ2 - 3, "east", "west") # right
+    placeDiningChairs(diningTableX1 + 3, lRoomZ2 - 3, diningTableX1 + 4, lRoomZ2 - 3, "west", "east") # left
+
+else:
+    diningSetup = 3
+    diningTableX1 = lRoomX1 + 3
+    diningTableX2 = diningTableX1 + 2
+    diningTableZ1 = lRoomZ2 - 5
+    diningTableZ2 = diningTableZ1 + 2
+
+    # Chairs
+    placeDiningChairs(diningTableX1 + 2, lRoomZ2 - 2, diningTableX1 + 2, lRoomZ2 - 1, "north", "south") # back - left
+    placeDiningChairs(diningTableX1, lRoomZ2 - 2, diningTableX1, lRoomZ2 - 1, "north", "south") # back - right
+    
+    placeDiningChairs(diningTableX1 + 2, lRoomZ2 - 6, diningTableX1 + 2, lRoomZ2 - 7, "south", "north") # front - left
+    placeDiningChairs(diningTableX1, lRoomZ2 - 6, diningTableX1, lRoomZ2 - 7, "south", "north") # front - right
+
+    placeDiningChairs(diningTableX1 + 3, lRoomZ2 - 3, diningTableX1 + 4, lRoomZ2 - 3, "west", "east") # left - back
+    placeDiningChairs(diningTableX1 + 3, lRoomZ2 - 5, diningTableX1 + 4, lRoomZ2 - 5, "west", "east") # left - front
+    
+    placeDiningChairs(diningTableX1 - 1, lRoomZ2 - 3, diningTableX1 - 2, lRoomZ2 - 3, "east", "west") # right - back
+    placeDiningChairs(diningTableX1 - 1, lRoomZ2 - 5, diningTableX1 - 2, lRoomZ2 - 5, "east", "west") # right - front
+  
+
+
+placeCuboid(editor, (lRoomX2 - 1, y + 1, couchRZ1 - 1), (lRoomX2 - 1, y + 1, couchRZ2),
+            Block(chairWood + "_shelf", {"facing": "west"}))
+tvPos = str(tvX + " " + tvY + " " + tvZ)
+command = ("summon minecraft:painting " + tvPos + " {facing:1,variant:'minecraft:" + tvScreen + "'}")
+print(command)
+runCommand(command)
+
+# endregion
+
+# region Dining Room
+# Building Dining Table
+placeCuboid(editor, (diningTableX1, onFloorY, diningTableZ1),
+            (diningTableX2, onFloorY, diningTableZ2), Block(chairArmWood + "_slab", {"type": "top"}))
+
+# endregion
+
+# region Kitchen
+# endregion
+
+# region Bathroom
+# endregion
+
 # endregion
