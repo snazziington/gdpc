@@ -17,7 +17,7 @@ editor.loadWorldSlice(cache=True)
 heightmap = editor.worldSlice.heightmaps["MOTION_BLOCKING_NO_LEAVES"] # type: ignore
 
 #  y = Foundation height
-y = heightmap[1, 1] # + 3 is temporary while i do blueprints
+y = heightmap[1, 1] + 10 # + 3 is temporary while i do blueprints
 
 # x & z coordinates to build the house
 houseX = buildArea.offset.x + 1
@@ -25,18 +25,15 @@ houseZ = buildArea.offset.z + 1
 
 height = 5
 
-# clear area
-placeCuboid(editor, (houseX, y, houseZ), (houseX + 100, y + 10, houseZ + 100), Block("air"))
-
 # region LIVINGROOM
 # Coordinates
 # Width
 lRoomX1 = houseX + 25 # always 25 blocks from edge
-lRoomX2 = lRoomX1 + randint(7, 10)
+lRoomX2 = lRoomX1 + 9#randint(7, 10)
 
 #Depth
 lRoomZ1 = houseZ # + 10 # always 10 blocks from edge
-lRoomZ2 = lRoomZ1 + randint(13, 16)
+lRoomZ2 = lRoomZ1 + 16#randint(13, 16)
 
 # Livingroom Palette
 livingRoomWall = Block("white_concrete")
@@ -52,7 +49,7 @@ placeCuboidHollow(editor, (lRoomX1, y, lRoomZ1), (lRoomX2, y, lRoomZ2), livingRo
 # region GARAGE
 # Coordinates
 # Width
-garageWidth = choice([7, 9])
+garageWidth = 9#choice([7, 9])
 garageDoorWidth = math.floor((garageWidth - 2) / 2)
 garageX1 = lRoomX2 + 1
 garageX2 = garageX1 + garageWidth
@@ -116,7 +113,7 @@ placeCuboidHollow(editor, (garageX1, y, garageZ1), (garageX2, y, garageZ2), gara
 # Width --- Should be dependent on the size of the rooms!
 # Or actually; the rooms should be dependent on the size of the hallways.
 hallwayWidth  = 3
-hallwayLength = 10 # randint(10, 18) # randint(10, 20) # till 18---
+hallwayLength = 18 # randint(10, 18) # randint(10, 20) # till 18---
 hallwayX1 = lRoomX1
 hallwayX2 = hallwayX1 - hallwayLength # randint(6, 8)
 
