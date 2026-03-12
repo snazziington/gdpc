@@ -1,13 +1,13 @@
 import math, statistics
 from random import randint, choice
-from gdpc import Editor, Block #, Transform
-from gdpc.geometry import placeCuboid, placeCuboidHollow, placeRectOutline, placeCuboidWireframe
+from gdpc import Editor, Block, Transform
+from gdpc.geometry import placeCuboid, placeCuboidHollow, placeRectOutline, placeCuboidWireframe, placeCheckeredCuboid
 from gdpc.interface import runCommand
 
 editor = Editor(buffering=True)
 
 buildArea = editor.getBuildArea()
-placeRectOutline(editor, buildArea.toRect(), 67, Block("red_concrete"))
+placeRectOutline(editor, buildArea.toRect(), 100, Block("red_concrete"))
 
 # region BUILD HOUSE LAYOUT
 # region HOUSE PLACEMENT
@@ -15,7 +15,8 @@ placeRectOutline(editor, buildArea.toRect(), 67, Block("red_concrete"))
 editor.loadWorldSlice(cache=True)
 
 # Get heightmap
-heightmap = editor.worldSlice.heightmaps["OCEAN_FLOOR"] # type: ignore
+heightmap = editor.worldSlice.heightmaps["MOTION_BLOCKING_NO_LEAVES"] # type: ignore
+waterHeightmap = editor.worldSlice.heightmaps["OCEAN_FLOOR"] # type: ignore
 
 # x & z coordinates to build the house
 buildAreaX1 = buildArea.offset.x + 1
@@ -40,17 +41,17 @@ pillarHeight = 1
 houseHeight = randint(5, 7) # determines height of house
 print("houseHeight: ", houseHeight)
 
-lRoomDepth = randint(13, 16) # livingRoom depth
+lRoomDepth = 16#randint(13, 16) # livingRoom depth
 print("lRoomDepth: ", lRoomDepth)
 
-lRoomWidth = randint(7, 9) # livingRoom width
+lRoomWidth = 7 #randint(7, 9) # livingRoom width
 print("lRoomWidth: ", lRoomWidth)
 
-hallwayLength = randint(10, 18) # length of hallway. if > 15, third bedroom spawns
+hallwayLength = 18#randint(11, 18) # length of hallway. if > 15, third bedroom spawns
 print("hallwayLength: ", hallwayLength)
 
 # Garage Sizing
-garageWidth = choice([7, 9])
+garageWidth = 7 #choice([7, 9])
 garageDepth = math.floor(lRoomDepth * .7)
 print("garageWidth: ", garageWidth)
 print("garageDepth: ", garageDepth)
@@ -93,6 +94,7 @@ def calcHeightMap(x: int, z: int):
     newStdDev = float(statistics.stdev(heightMapList))
     if newStdDev < lowestStdDev:
             if notSubmergedInWater():
+                print("testing here")
                 lowestStdDev = newStdDev
 
                 global averageY
@@ -108,33 +110,43 @@ def calcHeightMap(x: int, z: int):
                 y = int(heightmap[lowestX, lowestZ] + 2) + 20
 
 def notSubmergedInWater():
-    global blockArray
-    blockArray = []
-    for xX in range (x, x + houseTotalWidth):
-        if xX % 5 == 0:
-            for zZ in range (z, z + houseTotalDepth):
-                if zZ % 5 == 0:
-                    y = heightmap[xX, zZ]
-                    y = int(y)
-                    block = editor.getBlock((xX, y, zZ))
-                    print(block)
-    return True
-    
+    global waterCount
+    waterCount = 0
 
-for x in range (0, 100 - houseTotalWidth):
-    if x % 10 == 0:
-        for z in range (0, 100 - houseTotalDepth):
-            if z % 10 == 0:
+    global nonWaterCount
+    nonWaterCount = 0
+    for xX in range (x, x + houseTotalWidth):
+        if xX % 2 == 0:
+            for zZ in range (z, z + houseTotalDepth):
+                if zZ % 2 == 0:
+                    y = waterHeightmap[xX, zZ]
+                    y = int(y)
+                    
+                    for i in range (0, 3):
+                        block = str(editor.getBlock((xX + buildArea.offset.x, y + i, zZ + buildArea.offset.z)))
+                        #print(block, (xX + buildArea.offset.x, y + i, zZ + buildArea.offset.z))
+                        if "water" in block:
+                            waterCount += 1
+                        else:
+                            nonWaterCount += 1
+
+    print("Water count: ", waterCount, "Non-water count: ", nonWaterCount, "Calc: ", nonWaterCount * 0.7 - waterCount)
+    if nonWaterCount * 0.6 > waterCount:
+       print("Located better area")
+       return True
+    else:
+        print("Too much water!")
+        return False
+
+for x in range (2, 100 - houseTotalWidth - 4):
+    if x % 2 == 0:
+        for z in range (2, 100 - houseTotalDepth - 4):
+            if z % 2 == 0:
                 calcHeightMap(x, z)
-print("Lowest stdDev is found at: ", lowestX, lowestZ)
+print("Lowest stdDev is found at: ", lowestX, lowestZ, "and is: ", lowestStdDev)
 
 y1 = heightmap[lowestX, lowestZ] - 1
 y2 = heightmap[lowestX + houseTotalWidth, lowestZ + houseTotalDepth] - 1
-
-editor.placeBlock((lowestX + buildArea.offset.x, y1 + 30, lowestZ + buildArea.offset.z), Block("netherite_block"))
-editor.placeBlock((lowestX + buildArea.offset.x + houseTotalWidth,
-                   y1 + 30,
-                   lowestZ + buildArea.offset.z + houseTotalDepth), Block("iron_block"))
 
 y = averageY + 1
 
@@ -176,15 +188,33 @@ if garageHouse == 1:
                (garageBoundingX2, y + houseHeight, garageBoundingZ2), Block("air"))
 
 # region BLOCK PALETTES
-houseWalls = choice([
-    Block ("mud_bricks"),
-    Block ("brown_mushroom_block"),
-    Block ("terracotta"),
-    Block ("white_terracotta"),
-    Block ("smooth_quartz"),
+houseWalls = randint(0, 3)
+if houseWalls == 0:
+    houseWalls = ([
+    Block ("quartz_block"),
+    Block ("chiseled_quartz_block"),
+    Block ("quartz_bricks"),
+    Block ("quartz_pillar"),
+    Block ("smooth_quartz")
+    ])
+elif houseWalls == 1:
+    houseWalls = ([
     Block ("smooth_sandstone"),
-    Block ("yellow_terracotta"),
-]) 
+    Block ("sandstone"),
+    Block ("cut_sandstone"),
+])
+elif houseWalls == 2:
+    houseWalls = ([
+    Block ("stripped_oak_wood"),
+    Block ("stripped_jungle_wood"),
+])
+
+else:
+    houseWalls = ([
+    Block ("smooth_red_sandstone"),
+    Block ("red_sandstone"),
+    Block ("cut_red_sandstone")
+])
 
 houseDoor = choice([
     "dark_oak_door",
@@ -229,12 +259,12 @@ roofBlock = choice([
 ])
 
 porchFenceBlock = choice([
-    Block("dark_oak_fence"),
-    Block("oak_fence"),
-    Block("spruce_fence"),
-    Block("jungle_fence"),
-    Block("nether_brick_fence"),
-    Block("crimson_fence"),
+    "dark_oak",
+    "oak",
+    "spruce",
+    "jungle",
+    "nether_brick",
+    "crimson",
 ])
 
 porchWall = choice([
@@ -259,7 +289,8 @@ lRoomZ1 = buildAreaZ1 + porchDepth + 2
 lRoomZ2 = lRoomZ1 + lRoomDepth
 
 # Livingroom Palette
-livingRoomFloor = Block("white_wool")
+livingRoomFloor = choice([Block("white_terracotta"), Block("white_concrete"), 
+                          Block("birch_planks"), Block("pale_oak_planks")])
 
 # Livingroom Wall
 placeCuboidHollow(editor, (lRoomX1, y, lRoomZ1), (lRoomX2, y + houseHeight, lRoomZ2), houseWalls)
@@ -269,8 +300,9 @@ placeCuboidHollow(editor, (lRoomX1, y, lRoomZ1), (lRoomX2, y, lRoomZ2), livingRo
 
 # Livingroom Doors
 # Add double doors
-editor.placeBlock((lRoomX1+2, y+1, lRoomZ1), Block(houseDoor, {"facing": "south", "hinge": "right"}))
-editor.placeBlock((lRoomX1+3, y+1, lRoomZ1), Block(houseDoor, {"facing": "south", "hinge": "left"}))
+editor.placeBlock((lRoomX1 + 2, y + 1, lRoomZ1), Block(houseDoor, {"facing": "south", "hinge": "right"}))
+editor.placeBlock((lRoomX1 + 3, y + 1, lRoomZ1), Block(houseDoor, {"facing": "south", "hinge": "left"}))
+editor.placeBlock((lRoomX1 + 4, y + 2, lRoomZ1 - 1), Block("bell", {"attachment": "single_wall", "facing": "south"}))
 
 # LIVINGROOM WINDOWS
 wallPlacement = 2
@@ -281,13 +313,23 @@ windowY2 = y + houseHeight - 2
 # Front
 placeCuboidHollow(editor, (lRoomX1 + 5, windowY1, lRoomZ1), (lRoomX2, windowY2, lRoomZ1), windowBlock)
 
+# Front flower pots
+flower = ([Block("potted_dandelion"), Block("potted_poppy"), Block("potted_blue_orchid"), Block("potted_allium"),
+           Block("potted_azure_bluet"), Block("potted_orange_tulip"), Block("oxeye_daisy"), Block("potted_cornflower"),
+           Block("potted_lily_of_the_valley"), Block("potted_oak_sapling"), Block("potted_jungle_sapling")])
+print()
+placeCuboidHollow(editor, (lRoomX1 + 5, windowY1 - 1, lRoomZ1 - 1), (lRoomX2 - 1, windowY1 - 1, lRoomZ1 - 1), Block("grass_block"))
+placeCuboidHollow(editor, (lRoomX1 + 5, windowY1, lRoomZ1 - 1), (lRoomX2 - 1, windowY1, lRoomZ1 - 1), flower)
+placeCuboidHollow(editor, (lRoomX1 + 5, windowY1 - 1, lRoomZ1 - 2), (lRoomX2 - 1, windowY1 - 1, lRoomZ1 - 2), Block(porchFenceBlock + "_trapdoor", {"facing": "north", "open": "true"}))
+editor.placeBlock((lRoomX1 + 4, windowY1 - 1, lRoomZ1 - 1), Block(porchFenceBlock + "_trapdoor", {"facing": "west", "open": "true"}))
+editor.placeBlock((lRoomX1, windowY1, lRoomZ1 - 1), Block("lantern"))
+
 if houseHeight > 5:
     placeCuboidHollow(editor, (lRoomX1+2, y+4, lRoomZ1), (lRoomX1+3, y+4, lRoomZ1), windowBlock)
 
 # Side
 if garageHouse == 1:
     placeCuboidHollow(editor, (lRoomX2, windowY1, lRoomZ1), (lRoomX2, windowY2, int((lRoomZ1 * .7 + lRoomZ2 * 0.3)) - 1), windowBlock)
-    print(garageBoundingZ1 - 2)
 else:
     placeCuboidHollow(editor, (lRoomX2, windowY1, lRoomZ1), (lRoomX2, windowY2, lRoomZ2 - 1), windowBlock)
     livingroomWindowWidth = lRoomZ2 - lRoomZ1 - 1
@@ -356,8 +398,7 @@ hallwayZ1 = int((lRoomZ1 + lRoomZ2) / 2 - 2)
 hallwayZ2 = hallwayZ1 + 3
 
 # Hallway Palette
-hallwayWall = Block("blue_concrete")
-hallwayFloor = Block("blue_wool")
+hallwayFloor = livingRoomFloor
 
 # Hallway Wall 
 placeCuboidHollow(editor, (hallwayX1, y, hallwayZ1), (hallwayX2, y + houseHeight, hallwayZ2), houseWalls)
@@ -387,11 +428,10 @@ bedroom1Z1 = lRoomZ1
 bedroom1Z2 = hallwayZ1
 
 #Palette
-bedroom1Wall = Block("red_concrete")
-bedroom1Floor = Block("red_wool")
+bedroomFloor = choice([Block("spruce_planks"), Block("oak_planks")])
 
 placeCuboidHollow(editor, (bedroom1X1, y, bedroom1Z1), (bedroom1X2, y + houseHeight, bedroom1Z2), houseWalls) 
-placeCuboidHollow(editor, (bedroom1X1, y, bedroom1Z1), (bedroom1X2, y, bedroom1Z2), bedroom1Floor) 
+placeCuboidHollow(editor, (bedroom1X1, y, bedroom1Z1), (bedroom1X2, y, bedroom1Z2), bedroomFloor) 
 
 # Windows
 placeCuboidHollow(editor, (bedroom1X1, windowY1, bedroom1Z1), (bedroom1X2 - 1, windowY2, bedroom1Z1), windowBlock)
@@ -425,12 +465,8 @@ bedroom2X2 = bedroom1X1
 bedroom2Z1 = lRoomZ1
 bedroom2Z2 = hallwayZ1
 
-#Palette
-bedroom2Wall = Block("orange_concrete")
-bedroom2Floor = Block("orange_wool")
-
 placeCuboidHollow(editor, (bedroom2X1, y, bedroom2Z1), (bedroom2X2, y + houseHeight, bedroom2Z2), houseWalls) 
-placeCuboidHollow(editor, (bedroom2X1, y, bedroom2Z1), (bedroom2X2, y, bedroom2Z2), bedroom2Floor)
+placeCuboidHollow(editor, (bedroom2X1, y, bedroom2Z1), (bedroom2X2, y, bedroom2Z2), bedroomFloor)
 
 # Windows
 placeCuboidHollow(editor, (bedroom2X1 + 1, windowY1, bedroom2Z1), (bedroom2X2 - 1, windowY2, bedroom2Z1), windowBlock) # front
@@ -482,10 +518,9 @@ else:
 
     #Palette
     bedroom3Wall = Block("cyan_concrete")
-    bedroom3Floor = Block("cyan_wool")
 
     placeCuboidHollow(editor, (bedroom3X1, y, bedroom3Z1), (bedroom3X2, y + houseHeight, bedroom3Z2), houseWalls) 
-    placeCuboidHollow(editor, (bedroom3X1, y, bedroom3Z1), (bedroom3X2, y, bedroom3Z2), bedroom3Floor)
+    placeCuboidHollow(editor, (bedroom3X1, y, bedroom3Z1), (bedroom3X2, y, bedroom3Z2), bedroomFloor)
 
     # Windows
     # Back
@@ -521,10 +556,11 @@ kitchenZ2 = hallwayZ2
 
 #Palette
 kitchenWall = Block("yellow_concrete")
-kitchenFloor = Block("yellow_wool")
+kitchenFloor1 = choice([Block("white_concrete"), Block("white_shulker_box"), Block("pale_oak_planks")])
+kitchenFloor2 = choice([Block("black_concrete"), Block("black_shulker_box"), Block("dark_oak_planks")])
 
 placeCuboidHollow(editor, (kitchenX1, y, kitchenZ1), (kitchenX2, y + houseHeight, kitchenZ2), houseWalls) 
-placeCuboidHollow(editor, (kitchenX1, y, kitchenZ1), (kitchenX2, y, kitchenZ2), kitchenFloor)
+placeCheckeredCuboid(editor, (kitchenX1, y, kitchenZ1), (kitchenX2, y, kitchenZ2), kitchenFloor1, kitchenFloor2)
 
 #Windows
 placeCuboidHollow(editor, (kitchenX1 + 1, y + 2, kitchenZ1), (kitchenX2 - 1, windowY2, kitchenZ1), windowBlock)
@@ -552,7 +588,7 @@ bathroomZ2 = hallwayZ2
 
 #Palette
 bathroomWall = Block("green_concrete")
-bathroomFloor = Block("green_wool")
+bathroomFloor = choice([Block("stone_bricks"), Block("quartz_bricks"), Block("polished_diorite")])
 
 placeCuboidHollow(editor, (bathroomX1, y, bathroomZ1), (bathroomX2, y + houseHeight, bathroomZ2), houseWalls) 
 placeCuboidHollow(editor, (bathroomX1, y, bathroomZ1), (bathroomX2, y, bathroomZ2), bathroomFloor) 
@@ -643,11 +679,11 @@ if porchWidth % 2 == 1:
 # region PORCH PLACEMENT
 # porch fences
 placeCuboid(editor, (porchX1, y + 1, porchZ1),
-                  (porchX2, y + 1, porchZ1), porchFenceBlock)
+                  (porchX2, y + 1, porchZ1), Block(porchFenceBlock + "_fence"))
 placeCuboid(editor, (porchX2, y + 1, porchZ1),
-                  (porchX2, y + 1, porchZ2), porchFenceBlock)
+                  (porchX2, y + 1, porchZ2), Block(porchFenceBlock + "_fence"))
 placeCuboid(editor, (porchX1, y + 1, porchZ1),
-                  (porchX1, y + 1, porchZ2), porchFenceBlock)
+                  (porchX1, y + 1, porchZ2), Block(porchFenceBlock + "_fence"))
 
 # Opens up area for stairs
 placeCuboidWireframe(editor, (porchX1, y + 1, porchZ1 + 2),
@@ -745,6 +781,64 @@ if garageHouse == 1:
         
     # Garage Floor
     placeCuboidHollow(editor, (garageX1, y, garageZ1), (garageX2, y, garageZ2), garageFloor)
+
+# region CAR
+carX1 = garageX1 + 3
+carZ1 = garageZ1 + 3
+
+carX2 = carX1 + 2
+carZ2 = carZ1 + 3
+
+carBody = Block("dark_oak_slab" ,{"type": "top"})
+onFloorY = y + 1
+
+carNo = randint(0, 10)
+carColourPalette = (["white", "gray", "black", "brown", "red", "orange",
+                     "yellow", "cyan", "purple", "magenta", "pink"])
+carTerracotta = Block(carColourPalette[carNo] + "_terracotta")
+
+carSlabPalette = (["pale_oak", "nether_brick", "nether_brick", "dark_oak", "mangrove", "acacia",
+                   "bamboo", "warped", "crimson", "crimson", "mangrove"])
+carSlab = Block(carSlabPalette[carNo] + "_slab", {"type": "top"})
+
+placeCuboidWireframe(editor, (carX1, onFloorY, carZ1), (carX2, onFloorY, carZ2), carBody)
+editor.placeBlock((carX1, onFloorY, carZ1), Block("black_wool"))
+editor.placeBlock((carX1, onFloorY, carZ2), Block("black_wool"))
+editor.placeBlock((carX2, onFloorY, carZ1), Block("black_wool"))
+editor.placeBlock((carX2, onFloorY, carZ2), Block("black_wool"))
+
+editor.placeBlock((carX1 - 1, onFloorY, carZ1), Block("stone_button", {"facing": "west"}))
+editor.placeBlock((carX1 - 1, onFloorY, carZ2), Block("stone_button", {"facing": "west"}))
+editor.placeBlock((carX2 + 1, onFloorY, carZ1), Block("stone_button", {"facing": "east"}))
+editor.placeBlock((carX2 + 1, onFloorY, carZ2), Block("stone_button", {"facing": "east"}))
+
+editor.placeBlock((carX1, onFloorY, carZ2 + 1), Block("hopper", {"facing": "north"}))
+editor.placeBlock((carX2, onFloorY, carZ2 + 1), Block("hopper", {"facing": "north"}))
+
+placeCuboid(editor, (carX1, onFloorY, carZ1 - 1), (carX2, onFloorY, carZ1 - 1), carBody)
+placeCuboid(editor, (carX1, onFloorY + 1, carZ1 - 1), (carX1, onFloorY + 1, carZ2 + 1), carTerracotta)
+placeCuboid(editor, (carX1 + 1, onFloorY + 1, carZ1 - 1), (carX1 + 1, onFloorY + 1, carZ2 + 1), carTerracotta)
+placeCuboid(editor, (carX2, onFloorY + 1, carZ1 - 1), (carX2, onFloorY + 1, carZ2 + 1), carTerracotta)
+
+editor.placeBlock((carX1, onFloorY + 1, carZ1 + 5), Block("mangrove_button", {"facing": "south"}))
+editor.placeBlock((carX2, onFloorY + 1, carZ1 + 5), Block("mangrove_button", {"facing": "south"}))
+
+editor.placeBlock((carX1, onFloorY + 1, carZ1 - 2), Block("pale_oak_button", {"facing": "north"}))
+editor.placeBlock((carX2, onFloorY + 1, carZ1 - 2), Block("pale_oak_button", {"facing": "north"}))
+
+editor.placeBlock((carX1 + 1, onFloorY + 2, carZ1 - 1), Block(carColourPalette[carNo] + "_carpet"))
+editor.placeBlock((carX1 + 1, onFloorY + 1, carZ1 - 2), Block("bamboo_wall_sign", {"facing": "north"}))
+editor.placeBlock((carX1 + 1, onFloorY + 1, carZ2 + 2), Block("bamboo_wall_sign", {"facing": "south"}))
+
+editor.placeBlock((carX1, onFloorY + 1, carZ1), carSlab)
+editor.placeBlock((carX1, onFloorY + 1, carZ2), carSlab)
+editor.placeBlock((carX2, onFloorY + 1, carZ1), carSlab)
+editor.placeBlock((carX2, onFloorY + 1, carZ2), carSlab)
+
+placeCuboid(editor, (carX1, onFloorY + 2, carZ1), (carX2, onFloorY + 2, carZ1 + 1), Block("light_gray_stained_glass"))
+placeCuboid(editor, (carX1, onFloorY + 3, carZ1), (carX2, onFloorY + 3, carZ1 + 1), Block("gray_carpet"))
+# endregion
+
 # endregion
 
 # region FOUNDATION
@@ -752,22 +846,21 @@ houseX2 = lRoomX2
 houseZ2 = lRoomZ2
 
 # Main House
-placeCuboidHollow(editor, (bedroom2X1, y - 5, lRoomZ1), (houseX2, y - 1, houseZ2), foundationBlock)
+placeCuboidHollow(editor, (bedroom2X1, y - 20, lRoomZ1), (houseX2, y - 1, houseZ2), foundationBlock)
 placeCuboidWireframe(editor, (bedroom2X1, y, lRoomZ1), (houseX2, y, houseZ2), foundationBlock)
 
 # Garage Foundation
 if garageHouse == 1:
-    placeCuboidHollow(editor, (garageX1, y - 5, garageZ1), (garageX2, y - 1, garageZ2), foundationBlock)
+    placeCuboidHollow(editor, (garageX1, y - 20, garageZ1), (garageX2, y - 1, garageZ2), foundationBlock)
     placeCuboidWireframe(editor, (garageX1, y, garageZ1), (garageX2, y, garageZ2), foundationBlock)
 
 # Porch Foundation
-placeCuboidHollow(editor, (porchX1, y - 5, porchZ1), (porchX2, y - 1, porchZ2), foundationBlock)
+placeCuboidHollow(editor, (porchX1, y - 20, porchZ1), (porchX2, y - 1, porchZ2), foundationBlock)
 placeCuboidWireframe(editor, (porchX1, y, porchZ1), (porchX2, y, porchZ2), foundationBlock)
 
 # porch staircase
 for i in range (0, 10):
     block = editor.getBlock((porchX1 - i - 1, y - i, porchZ1 + 2))
-    print(block, porchX1 - i - 1, y - i, porchZ1 + 2)
     if block == Block("minecraft:air"):
         #placeCuboid(editor, (porchX1 - i - 1, y - i, porchZ1 + 2), (porchX1 - i - 1, y - i, porchZ2 - 2), Block(roofBlock + "_stairs", {"facing": "east"}))
         editor.placeBlock((porchX1 - i - 1, y - i, porchZ1 + 2), Block(roofBlock + "_stairs", {"facing": "east"}))
@@ -860,7 +953,6 @@ chairArmWood = choice([
 ])
 
 while chairWood == chairArmWood:
-    print("Rerolling chairArmWood")
     chairArmWood = choice([
     "dark_oak",
     "spruce",
@@ -893,7 +985,6 @@ def chooseAccentColour(painting: str):
 
     elif painting in yellowPaintings:
         accentColour = choice(["orange", "yellow", "lime", "green"])
-        print(accentColour)
     
     elif painting in greenPaintings:
         accentColour = choice(["green", "white", "light_gray"])
@@ -913,18 +1004,6 @@ def chooseAccentColour(painting: str):
 
     else:
         accentColour = choice(["magenta"])
-  
-
-food = choice([
-    ("cooked_porkchop", "cooked_beef", "cooked_mutton", "cooked_chicken", "cooked_rabbit"), # Meal #1
-    ("rabbit_stew", "beetroot_soup", "mushroom_stew"), # Meal #2
-    ("cooked_salmon", "cooked_cod"), # Meal #3
-    ("baked_potato", "golden_carrot", "carrot"), # Meal #4
-    ("pumpkin_pie", "cake"), # Meal #5
-    ("bread", "cookie") # Meal #6
-])
-# endregion
-# region Living Room
 # endregion
 
 # region Livingroom
@@ -961,7 +1040,6 @@ couchBX2 = lRoomX2 - 2 # wall side
 couchBZ1 = lRoomZ2 - 8 # depth
 
 rightCouchLength = (lRoomZ2 - 9) - (lRoomZ1 + 3)
-print("rightCouchLength: ", rightCouchLength)
 
 # TV
 tvX = str(lRoomX2 - 1)
@@ -1109,9 +1187,9 @@ else:
 placeCuboid(editor, (lRoomX2 - 1, y + 1, couchRZ1 - 1), (lRoomX2 - 1, y + 1, couchRZ2),
             Block(chairWood + "_shelf", {"facing": "west"}))
 tvPos = str(tvX + " " + tvY + " " + tvZ)
-command = ("summon minecraft:painting " + tvPos + " {facing:1,variant:'minecraft:" + tvScreen + "'}")
-print(command)
-runCommand(command)
+tvCommand = ("summon minecraft:painting " + tvPos + " {facing:1,variant:'minecraft:" + tvScreen + "'}")
+print(tvCommand)
+runCommand(tvCommand)
 
 # endregion
 
@@ -1119,13 +1197,109 @@ runCommand(command)
 # Building Dining Table
 placeCuboid(editor, (diningTableX1, onFloorY, diningTableZ1),
             (diningTableX2, onFloorY, diningTableZ2), Block(chairArmWood + "_slab", {"type": "top"}))
-
+plateX = diningTableX1
+plateZ = diningTableZ1
 # endregion
 
 # region Kitchen
+# Back
+editor.placeBlock((kitchenX1 + 2, onFloorY, kitchenZ2), Block(houseDoor, {"facing": "south", "hinge": "right"}))
+placeCuboid(editor, (kitchenX1 + 1, onFloorY, kitchenZ1 - 1), (kitchenX2 - 1, onFloorY, kitchenZ1 - 1), Block("barrel", {"facing": "north"}))
+editor.placeBlock((kitchenX1 + 2, onFloorY, kitchenZ1 - 1), Block("water_cauldron", {"level": "3"}))
+editor.placeBlock((kitchenX1 + 3, onFloorY + 1, kitchenZ1 - 1), flower)
+
+# Left Side
+placeCuboid(editor, (kitchenX2 - 1, onFloorY, kitchenZ2 + 1), (kitchenX2 - 1, onFloorY, kitchenZ1 - 1), Block(chairWood + "_planks"))
+placeCuboid(editor, (kitchenX2 - 1, onFloorY + 2, kitchenZ2 + 1), (kitchenX2 - 1, onFloorY + 2, kitchenZ1 - 1), Block("barrel", {"facing": "west"}))
+editor.placeBlock((kitchenX2 - 1, onFloorY, kitchenZ2 + 2), Block("furnace", {"facing": "west"}))
+editor.placeBlock((kitchenX2 - 1, onFloorY, kitchenZ2 + 3), Block("furnace", {"facing": "west"}))
+
+# Corner Fridge
+placeCuboid(editor, (kitchenX2 - 1, onFloorY, kitchenZ2 + 1), (kitchenX2 - 1, onFloorY + 1, kitchenZ2 + 1), Block("iron_block"))
 # endregion
 
 # region Bathroom
+editor.placeBlock((bathroomX1 + 1, onFloorY + 1, bathroomZ1 - 1), Block("smooth_quartz"))
+editor.placeBlock((bathroomX1 + 1, onFloorY, bathroomZ1 - 1), Block("smooth_quartz_stairs", {"facing": "north", "half": "top"}))
+editor.placeBlock((bathroomX1 + 1, onFloorY, bathroomZ1 - 2), Block("smooth_quartz_stairs", {"facing": "south", "half": "top"}))
+editor.placeBlock((bathroomX1 + 1, onFloorY + 1, bathroomZ1 - 2), Block("white_wall_banner", {"facing": "north"}))
+editor.placeBlock((bathroomX2 - 1, y + houseHeight - 1, bathroomZ1 - 1), Block("iron_chain", {"axis": "y"}))
+editor.placeBlock((bathroomX2 - 1, y + houseHeight - 2, bathroomZ1 - 1), Block("iron_chain", {"axis": "y"}))
+editor.placeBlock((bathroomX2 - 1, y + houseHeight - 3, bathroomZ1 - 1), Block("pale_oak_trapdoor", {"facing": "north", "half": "top"}))
+  
+editor.placeBlock((bathroomX2 - 1, onFloorY, bathroomZ2 + 2), Block("smooth_quartz_stairs", {"facing": "east", "half": "top"}))
+editor.placeBlock((bathroomX2 - 1, onFloorY + 1, bathroomZ2 + 2), Block("light_blue_wall_banner", {"facing": "west"}))
+
+editor.placeBlock((bathroomX1 + 2, onFloorY, bathroomZ2), Block(houseDoor, {"facing": "south", "hinge": "left"}))
 # endregion
 
+# region Bedrooms
+# region Bedroom #1
+
+# Bunk bed
+placeCuboid(editor, (bedroom1X2 - 1, onFloorY, bedroom1Z1 + 1), (bedroom1X2 - 2, onFloorY, bedroom1Z1 + 1), Block("chest", {"facing": "south"}))
+editor.placeBlock((bedroom1X2 - 1, onFloorY, bedroom1Z1 + 1), Block("chest", {"facing": "south", "type": "left"}))
+editor.placeBlock((bedroom1X2 - 2, onFloorY, bedroom1Z1 + 1), Block("chest", {"facing": "south", "type": "right"}))
+placeCuboid(editor, (bedroom1X2 - 1, onFloorY + 1, bedroom1Z2 - 1), (bedroom1X2 - 2, onFloorY + 1, bedroom1Z2 - 1), Block(chairWood + "_slab", {"type": "top"}))
+placeCuboid(editor, (bedroom1X2 - 1, onFloorY, bedroom1Z2 - 2), (bedroom1X2 - 1, onFloorY + 1, bedroom1Z2 - 2), Block("ladder", {"facing": "west"}))
+editor.placeBlock((bedroom1X2 - 2, onFloorY + 2, bedroom1Z2 - 1), Block(accentColour + "_bed", {"facing": "east"}))
+editor.placeBlock((bedroom1X2 - 2, onFloorY, bedroom1Z2 - 1), Block(accentColour + "_bed", {"facing": "east"}))
+placeCuboid(editor, (bedroom1X2 - 1, onFloorY + 2, bedroom1Z2 - 2), (bedroom1X2 - 2, onFloorY + 2, bedroom1Z2 - 2), Block(chairWood + "_wall_sign", {"facing": "north"}))
+editor.placeBlock((bedroom1X2 - 3, onFloorY + 2, bedroom1Z2 - 1), Block(chairWood + "_wall_sign", {"facing": "west"}))
+
+# Desk
+editor.placeBlock((bedroom1X1 + 1, onFloorY, bedroom1Z1 + 1), Block(chairWood + "_stairs", {"half": "top", "facing": "north"}))
+editor.placeBlock((bedroom1X1 + 1, onFloorY, bedroom1Z1 + 2), Block(chairWood + "_slab", {"type": "top"}))
+editor.placeBlock((bedroom1X1 + 1, onFloorY, bedroom1Z1 + 3), Block(chairWood + "_stairs", {"half": "top", "facing": "south"}))
+placeCuboid(editor, (bedroom1X1 + 1, onFloorY + 1, bedroom1Z1 + 1), (bedroom1X1 + 1, onFloorY + 1, bedroom1Z1 + 3), Block(accentColour + "_carpet"))
+
+# Chair
+editor.placeBlock((bedroom1X1 + 2, onFloorY, bedroom1Z1 + 2), Block(chairWood + "_stairs", {"half": "bottom", "facing": "east"}))
+
+# Door
+editor.placeBlock((bedroom1X1 + 2, onFloorY, bedroom1Z2), Block(houseDoor, {"hinge": "left", "facing": "north"}))
+
 # endregion
+
+# region Bedroom #2
+# Desk
+editor.placeBlock((bedroom2X2 - 1, onFloorY, bedroom2Z1 + 1), Block(chairWood + "_stairs", {"half": "top", "facing": "north"}))
+editor.placeBlock((bedroom2X2 - 1, onFloorY, bedroom2Z1 + 2), Block(chairWood + "_slab", {"type": "top"}))
+editor.placeBlock((bedroom2X2 - 1, onFloorY, bedroom2Z1 + 3), Block(chairWood + "_stairs", {"half": "top", "facing": "south"}))
+placeCuboid(editor, (bedroom2X2 - 1, onFloorY + 1, bedroom2Z1 + 1), (bedroom2X2 - 1, onFloorY + 1, bedroom2Z1 + 3), Block(accentColour + "_carpet"))
+
+# Chair
+editor.placeBlock((bedroom2X2 - 2, onFloorY, bedroom2Z1 + 2), Block(chairWood + "_stairs", {"half": "bottom", "facing": "west"}))
+
+# Bed
+placeCuboid(editor, (bedroom2X1 + 1, onFloorY, bedroom2Z2 - 1), (bedroom2X1 + 1, onFloorY, bedroom2Z2 - 4), Block("barrel", {"facing": "east"}))
+placeCuboid(editor, (bedroom2X1 + 2, onFloorY, bedroom2Z2 - 2), (bedroom2X1 + 2, onFloorY, bedroom2Z2 - 3), Block(accentColour + "_bed", {"facing": "west"}))
+editor.placeBlock((bedroom2X1 + 1, onFloorY + 1, bedroom2Z2 - 1), Block("lantern"))
+editor.placeBlock((bedroom2X1 + 1, onFloorY + 1, bedroom2Z2 - 4), flower)
+
+# Door
+editor.placeBlock((bedroom2X2 - 2, onFloorY, bedroom2Z2), Block(houseDoor, {"hinge": "right", "facing": "north"}))
+
+
+# endregion
+
+# region Bedroom #3
+if hallwayLength >= 15:
+    # Bed
+    placeCuboid(editor, (bedroom3X1 + 1, onFloorY, bedroom3Z2 - 1), (bedroom3X1 + 1, onFloorY, bedroom3Z2 - 4), Block("barrel", {"facing": "east"}))
+    placeCuboid(editor, (bedroom3X1 + 2, onFloorY, bedroom3Z2 - 2), (bedroom3X1 + 2, onFloorY, bedroom3Z2 - 3), Block(accentColour + "_bed", {"facing": "west"}))
+    editor.placeBlock((bedroom3X1 + 1, onFloorY + 1, bedroom3Z2 - 1), Block("lantern"))
+    editor.placeBlock((bedroom3X1 + 1, onFloorY + 1, bedroom3Z2 - 4), flower)
+
+    # Chest
+    editor.placeBlock((bedroom3X2 - 1, onFloorY, bedroom3Z1 + 1), Block("chest", {"facing": "west"}))
+
+    # Door
+    editor.placeBlock((bedroom3X2 - 2, onFloorY, bedroom3Z1), Block(houseDoor, {"facing": "south", "hinge": "left"}))
+# endregion
+# endregion
+# endregion
+
+
+runCommand("tp Snazziington " + tvPos)
+print("tp Snazziington " + tvPos)

@@ -19,9 +19,6 @@ y = heightmap[5,5]
 
 # endregion
 
-
-
-
 # region Deciding X/Z Coords
 x = buildArea.offset.x + 1
 z = buildArea.offset.z + 1
