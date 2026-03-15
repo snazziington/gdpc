@@ -183,7 +183,7 @@ if garageHouse == 1:
                (garageBoundingX2, y + houseHeight, garageBoundingZ2), Block("air"))
 
 # region BLOCK PALETTES
-houseWalls = randint(0, 3)
+houseWalls = 0#randint(0, 3)
 if houseWalls == 0:
     houseWalls = ([
     Block ("quartz_block"),
@@ -795,7 +795,7 @@ if garageHouse == 1:
     carSlab = Block(carSlabPalette[carNo] + "_slab", {"type": "top"})
 
     placeCuboidWireframe(editor, (carX1, onFloorY, carZ1), (carX2, onFloorY, carZ2), carBody)
-    editor.placeBlock((carX1, onFloorY, carZ1), Block("black_"))
+    editor.placeBlock((carX1, onFloorY, carZ1), Block("black_wool"))
     editor.placeBlock((carX1, onFloorY, carZ2), Block("black_wool"))
     editor.placeBlock((carX2, onFloorY, carZ1), Block("black_wool"))
     editor.placeBlock((carX2, onFloorY, carZ2), Block("black_wool"))
